@@ -18,18 +18,6 @@ Copy snapshot file  →  BAMOE 8.1 (EAP 8.1 — port 8180)
   → insert applicant 4 → fired = 1  ✅  (engine remembers applicants 1–3)
 ```
 
----
-
-## Prerequisites
-
-|             | BAMOE 8.0       | BAMOE 8.1              |
-|-------------|-----------------|------------------------|
-| EAP         | 7.4             | 8.1                    |
-| Port        | 8080            | 8180 (port offset 100) |
-| Java        | 11              | 17                     |
-| KIE version | 7.67.x          | 7.81.x                 |
-| Maven       | 3.8+            | (same build)           |
-
 Set these variables once — every command below uses them:
 
 ```bash
@@ -67,14 +55,6 @@ jar tf "$EAP80/standalone/deployments/kie-server.war" | grep session-marshal
 
 ## Step 2 — Start EAP 7.4
 
-```bash
-"$EAP80/bin/standalone.sh" -c standalone-full.xml -b 0.0.0.0 &
-```
-
-> **`-c standalone-full.xml` is required.** The default `standalone.xml` does not
-> include the JMS/messaging subsystem that `kie-server.war` needs.
-
-Wait ~30 seconds, then confirm the extension loaded:
 
 ```bash
 grep "SessionMarshal extension initialized" "$EAP80/standalone/log/server.log"
@@ -108,7 +88,7 @@ curl -s -u adminUser:admin@Redhat1 \
 </kie-container>'
 ```
 
-Confirm it started (wait ~5 seconds):
+Confirm it started 
 
 ```bash
 curl -s -u adminUser:admin@Redhat1 \
@@ -174,12 +154,6 @@ ls -lh "$EAP80/standalone/data/kie-snapshots/snapshot-loan-container-KBaseKS-KBa
 
 ## Step 7 — Stop EAP 7.4
 
-```bash
-"$EAP80/bin/jboss-cli.sh" --connect --command=':shutdown'
-```
-
----
-
 # Phase B — BAMOE 8.1
 
 ## Step 8 — Copy the snapshot to EAP 8.1
@@ -198,14 +172,6 @@ cp "$EAP80/standalone/data/kie-snapshots/snapshot-loan-container-KBaseKS-KBaseKS
 ---
 
 ## Step 9 — Start EAP 8.1 on port 8180
-
-```bash
-"$EAP81/bin/standalone.sh" \
-  -c standalone-full.xml -b 0.0.0.0 \
-  -Djboss.socket.binding.port-offset=100 &
-```
-
----
 
 ## Step 10 — Install the KJAR into the v8.1 KIE repo
 
@@ -242,8 +208,6 @@ grep "Restored.*loan-container" "$EAP81/standalone/log/server.log"
 # Expected: Restored container=loan-container kbase=KBaseKS session=KBaseKS_stateful — 6 facts
 ```
 
----
-
 ## Step 12 — Verify the migration
 
 Insert applicant 4. The engine already knows applicants 1–3 — it must fire exactly once.
@@ -258,8 +222,7 @@ curl -s -u adminUser:admin@Redhat1 \
     {"fire-all-rules":{"out-identifier":"fired"}}]}'
 ```
 
-| `fired` | Result |
-|---|---|
+| `fired` | Result                                                 |
+|---------|--------------------------------------------------------|
 | **1** ✅ | PASS — session migrated successfully from v8.0 to v8.1 |
-| **4** ❌ | FAIL — session was empty, snapshot was not restored |
-
+| **4** ❌ | FAIL — session was empty, snapshot was not restored    |
