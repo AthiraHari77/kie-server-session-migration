@@ -19,8 +19,9 @@
     <maven.compiler.source>11</maven.compiler.source>
     <maven.compiler.target>11</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <!-- Default EAP home — override with -Deap.home=/your/path if different -->
-    <eap.home>/Users/athirac/BAMOE-8/BAMOE-8.1/jboss-eap-7.4</eap.home>
+    <!-- Path to your EAP 7.4 installation. Override on the command line:
+         mvn clean install -Deap.home=/your/jboss-eap-7.4/path -->
+    <eap.home>${user.home}/jboss-eap-7.4</eap.home>
   </properties>
 
 
