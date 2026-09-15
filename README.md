@@ -24,6 +24,8 @@ Set these variables once — every command below uses them:
 export EAP80=/path/to/jboss-eap-7.4    # your EAP 7.4 installation
 export EAP81=/path/to/jboss-eap-8.1    # your EAP 8.1 installation
 export PROJECT=/path/to/this-repo       # where you cloned this project
+export KIE_USER=adminUser               # KIE Server username
+export KIE_PASS=admin@Redhat1           # KIE Server password
 ```
 
 ---
@@ -77,7 +79,7 @@ cp "$PROJECT/loan-kjar/target/loan-kjar.jar" "$KIE_REPO/com/example/loan-kjar/1.
 ## Step 4 — Deploy the container
 
 ```bash
-curl -s -u adminUser:admin@Redhat1 \
+curl -s -u "$KIE_USER:$KIE_PASS" \
   -X PUT -H "Content-Type: application/xml" \
   "http://localhost:8080/kie-server/services/rest/server/containers/loan-container" \
   -d '<kie-container container-id="loan-container">
@@ -92,7 +94,7 @@ curl -s -u adminUser:admin@Redhat1 \
 Confirm it started 
 
 ```bash
-curl -s -u adminUser:admin@Redhat1 \
+curl -s -u "$KIE_USER:$KIE_PASS" \
   -H "Accept: application/json" \
   "http://localhost:8080/kie-server/services/rest/server/containers/loan-container" \
   | grep -o '"status" : "[^"]*"'
@@ -108,7 +110,7 @@ After 3 calls the session holds 6 facts.
 
 ```bash
 # Iteration 1 — age 20 (Underage)
-curl -s -u adminUser:admin@Redhat1 \
+curl -s -u "$KIE_USER:$KIE_PASS" \
   -X POST -H "Content-Type: application/json" -H "Accept: application/json" \
   "http://localhost:8080/kie-server/services/rest/server/containers/instances/loan-container" \
   -d '{"lookup":"KBaseKS_stateful","commands":[
@@ -117,7 +119,7 @@ curl -s -u adminUser:admin@Redhat1 \
     {"fire-all-rules":{"out-identifier":"fired"}}]}'
 
 # Iteration 2 — age 21 (Approved)
-curl -s -u adminUser:admin@Redhat1 \
+curl -s -u "$KIE_USER:$KIE_PASS" \
   -X POST -H "Content-Type: application/json" -H "Accept: application/json" \
   "http://localhost:8080/kie-server/services/rest/server/containers/instances/loan-container" \
   -d '{"lookup":"KBaseKS_stateful","commands":[
@@ -126,7 +128,7 @@ curl -s -u adminUser:admin@Redhat1 \
     {"fire-all-rules":{"out-identifier":"fired"}}]}'
 
 # Iteration 3 — age 35 (Approved)
-curl -s -u adminUser:admin@Redhat1 \
+curl -s -u "$KIE_USER:$KIE_PASS" \
   -X POST -H "Content-Type: application/json" -H "Accept: application/json" \
   "http://localhost:8080/kie-server/services/rest/server/containers/instances/loan-container" \
   -d '{"lookup":"KBaseKS_stateful","commands":[
@@ -140,7 +142,7 @@ curl -s -u adminUser:admin@Redhat1 \
 ## Step 6 — Save the session snapshot
 
 ```bash
-curl -s -u adminUser:admin@Redhat1 \
+curl -s -u "$KIE_USER:$KIE_PASS" \
   "http://localhost:8080/kie-server/services/rest/server/containers/instances/loan-container/ksession/marshal/KBaseKS/KBaseKS_stateful"
 # Expected: Saved loan-container/KBaseKS/KBaseKS_stateful — 6 facts
 ```
@@ -187,7 +189,7 @@ cp "$PROJECT/loan-kjar/target/loan-kjar.jar" "$KIE_REPO_81/com/example/loan-kjar
 ## Step 11 — Deploy the container on v8.1
 
 ```bash
-curl -s -u adminUser:admin@Redhat1 \
+curl -s -u "$KIE_USER:$KIE_PASS" \
   -X PUT -H "Content-Type: application/xml" \
   "http://localhost:8180/kie-server/rest/server/containers/loan-container" \
   -d '<kie-container container-id="loan-container">
@@ -214,7 +216,7 @@ grep "Restored.*loan-container" "$EAP81/standalone/log/server.log"
 Insert applicant 4. The engine already knows applicants 1–3 — it must fire exactly once.
 
 ```bash
-curl -s -u adminUser:admin@Redhat1 \
+curl -s -u "$KIE_USER:$KIE_PASS" \
   -X POST -H "Content-Type: application/json" -H "Accept: application/json" \
   "http://localhost:8180/kie-server/rest/server/containers/instances/loan-container" \
   -d '{"lookup":"KBaseKS_stateful","commands":[
