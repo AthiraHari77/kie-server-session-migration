@@ -1,0 +1,22 @@
+package rules;
+
+import com.example.model.Applicant;
+import com.example.model.LoanApplication;
+
+rule "Underage"
+when
+    $app : LoanApplication($id : applicantId)
+    Applicant(id == $id, age < 21)
+then
+    $app.setApproved(false);
+    $app.setExplanation("Underage");
+end
+
+rule "Approved"
+when
+    $app : LoanApplication($id : applicantId, approved == false, explanation == null)
+    Applicant(id == $id, age >= 21)
+then
+    $app.setApproved(true);
+    $app.setExplanation("Approved");
+end

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.example</groupId>
+  <artifactId>loan-kie-server-example</artifactId>
+  <version>1.0.0</version>
+  <packaging>pom</packaging>
+  <name>BAMOE 8.0 KIE Server loan session marshal example</name>
+
+  <modules>
+    <module>loan-kjar</module>
+    <module>session-marshal-extension</module>
+  </modules>
+
+  <properties>
+    <kie.version>7.67.2.Final-redhat-00034</kie.version>
+    <maven.compiler.source>11</maven.compiler.source>
+    <maven.compiler.target>11</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!-- Default EAP home — override with -Deap.home=/your/path if different -->
+    <eap.home>/Users/athirac/BAMOE-8/BAMOE-8.1/jboss-eap-7.4</eap.home>
+  </properties>
+
+
+  <repositories>
+    <repository>
+      <id>internal-artifactory</id>
+      <name>IBM BAMOE Maven Repository</name>
+      <url>https://na.artifactory.swg-devops.com/artifactory/hyc-bamoe-team-maven-local</url>
+      <releases><enabled>true</enabled></releases>
+      <snapshots><enabled>false</enabled></snapshots>
+    </repository>
+  </repositories>
+  <pluginRepositories>
+    <pluginRepository>
+      <id>internal-artifactory</id>
+      <name>IBM BAMOE Maven Repository</name>
+      <url>https://na.artifactory.swg-devops.com/artifactory/hyc-bamoe-team-maven-local</url>
+      <releases><enabled>true</enabled></releases>
+      <snapshots><enabled>false</enabled></snapshots>
+    </pluginRepository>
+  </pluginRepositories>
+</project>

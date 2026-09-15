@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.example</groupId>
+    <artifactId>loan-kie-server-example</artifactId>
+    <version>1.0.0</version>
+  </parent>
+  <artifactId>session-marshal-extension</artifactId>
+  <dependencies>
+    <!-- KIE Server core API — lifecycle hooks (KieServerExtension) -->
+    <dependency>
+      <groupId>org.kie.server</groupId>
+      <artifactId>kie-server-services-common</artifactId>
+      <version>${kie.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <!-- KIE Server Drools extension — supplies RulesExecutionService and
+         KieServerApplicationComponentsService used by SessionMarshalAppComponents -->
+    <dependency>
+      <groupId>org.kie.server</groupId>
+      <artifactId>kie-server-services-drools</artifactId>
+      <version>${kie.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <!-- KIE Server REST common helpers (createResponse, getVariant, etc.) -->
+    <dependency>
+      <groupId>org.kie.server</groupId>
+      <artifactId>kie-server-rest-common</artifactId>
+      <version>${kie.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <!-- Public KIE API — KieSession, Marshaller, KieServices -->
+    <dependency>
+      <groupId>org.kie</groupId>
+      <artifactId>kie-api</artifactId>
+      <version>${kie.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <!-- Internal KIE API — KieServerApplicationComponentsService SPI -->
+    <dependency>
+      <groupId>org.kie</groupId>
+      <artifactId>kie-internal</artifactId>
+      <version>${kie.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>1.7.36</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>javax.ws.rs</groupId>
+      <artifactId>javax.ws.rs-api</artifactId>
+      <version>2.1.1</version>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!--
+        After building the extension JAR, automatically inject it into
+        kie-server.war so no manual copy step is needed.
+
+        How it works:
+          1. Creates a temp directory with the path WEB-INF/lib/ inside it
+          2. Copies the built JAR into that directory
+          3. Runs "jar uf" to update the packed WAR with the new entry
+             (jar uf records the path relative to where it runs, so the
+              entry is stored as WEB-INF/lib/session-marshal-extension-1.0.0.jar)
+          4. Deletes the temp directory
+
+        The WAR path is read from the property eap.home which defaults to
+        the local jboss-eap-7.4 folder. Override on the command line:
+          mvn clean install -Deap.home=/your/eap/path
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>3.1.0</version>
+        <executions>
+          <execution>
+            <id>inject-into-kie-server-war</id>
+            <phase>install</phase>
+            <goals><goal>run</goal></goals>
+            <configuration>
+              <target>
+                <property name="war.path"
+                          value="${eap.home}/standalone/deployments/kie-server.war"/>
+                <property name="ext.jar"
+                          value="${project.build.directory}/${project.build.finalName}.jar"/>
+                <property name="stage.dir"
+                          value="${project.build.directory}/war-inject-stage"/>
+
+                <mkdir dir="${stage.dir}/WEB-INF/lib"/>
+                <copy file="${ext.jar}" todir="${stage.dir}/WEB-INF/lib"/>
+
+                <jar destfile="${war.path}" update="true" basedir="${stage.dir}">
+                  <include name="WEB-INF/lib/${project.build.finalName}.jar"/>
+                </jar>
+
+                <delete dir="${stage.dir}"/>
+                <echo>Injected ${ext.jar} into ${war.path}</echo>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+</project>
