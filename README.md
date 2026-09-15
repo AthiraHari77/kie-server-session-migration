@@ -199,21 +199,10 @@ cp "$EAP80/standalone/data/kie-snapshots/snapshot-loan-container-KBaseKS-KBaseKS
 
 ## Step 9 — Start EAP 8.1 on port 8180
 
-Both EAP instances run on the same machine so EAP 8.1 must use a different port.
-`-Djboss.socket.binding.port-offset=100` shifts all ports by 100
-(HTTP `8080 → 8180`, management `9990 → 10090`).
-
 ```bash
 "$EAP81/bin/standalone.sh" \
   -c standalone-full.xml -b 0.0.0.0 \
   -Djboss.socket.binding.port-offset=100 &
-```
-
-Wait ~30 seconds, then confirm the extension loaded:
-
-```bash
-grep "SessionMarshal extension initialized" "$EAP81/standalone/log/server.log"
-# Expected: SessionMarshal extension initialized. Snapshot directory: .../standalone/data/kie-snapshots
 ```
 
 ---
@@ -229,10 +218,6 @@ cp "$PROJECT/loan-kjar/target/loan-kjar.jar" "$KIE_REPO_81/com/example/loan-kjar
 ---
 
 ## Step 11 — Deploy the container on v8.1
-
-> **Note:** The KIE Server REST path changed between EAP versions:
-> - EAP 7.4: `/kie-server/services/rest/server/...`
-> - EAP 8.1: `/kie-server/rest/server/...`
 
 ```bash
 curl -s -u adminUser:admin@Redhat1 \
@@ -278,16 +263,3 @@ curl -s -u adminUser:admin@Redhat1 \
 | **1** ✅ | PASS — session migrated successfully from v8.0 to v8.1 |
 | **4** ❌ | FAIL — session was empty, snapshot was not restored |
 
----
-
-## Troubleshooting
-
-| Symptom | Fix |
-|---|---|
-| `fired = 4` on v8.0 | Snapshot file missing — check `$EAP80/standalone/data/kie-snapshots/` |
-| `fired = 4` on v8.1 | Snapshot not copied — redo Step 8 |
-| Container stays `CREATING` on v8.1 | KJAR not in v8.1 KIE repo — redo Step 10 |
-| Extension endpoint 404 | Extension JAR not in WAR — redo Step 1 |
-| EAP starts with errors (MDB failure) | Must use `-c standalone-full.xml`, not default `standalone.xml` |
-| EAP 8.1 fails to start (address in use) | EAP 7.4 still running — stop it first (Step 7), or confirm `--port-offset=100` |
-| `BUILD FAILURE` — artifact not found | Pass `-s /path/to/settings.xml` pointing to your BAMOE Maven repo |
