@@ -53,8 +53,9 @@ jar tf "$EAP80/standalone/deployments/kie-server.war" | grep session-marshal
 
 ---
 
-## Step 2 — Start EAP 7.4
+## Step 2 — Start EAP 7.4 with standalone-full profile
 
+### Confirm the extension is initialized
 
 ```bash
 grep "SessionMarshal extension initialized" "$EAP80/standalone/log/server.log"
