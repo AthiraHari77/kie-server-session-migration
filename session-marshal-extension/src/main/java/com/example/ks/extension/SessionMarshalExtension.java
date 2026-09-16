@@ -49,11 +49,14 @@ public class SessionMarshalExtension implements KieServerExtension {
 
     /**
      * System property name for the snapshot directory.
-     * Set in EAP standalone.conf:
+     * MUST be set before starting the server:
      *   -Dkie.session.snapshot.dir=/your/path
      *
-     * Default: ${jboss.server.data.dir}/kie-snapshots
-     *   → resolves to standalone/data/kie-snapshots inside the EAP installation.
+     * Why this is the only resolution path:
+     *   Using a container-specific property such as jboss.server.data.dir makes
+     *   the extension non-portable — it silently puts snapshots in different
+     *   locations on Tomcat, WebSphere, WildFly, etc.  An explicit operator-
+     *   provided path is the only reliable, portable approach.
      *
      * Why not /tmp:
      *   /tmp is cleared on reboot — snapshots written there are lost on restart,
@@ -61,11 +64,9 @@ public class SessionMarshalExtension implements KieServerExtension {
      *   /tmp is also not writable by the EAP service account on hardened servers.
      *
      * Resolved lazily in init() so the system property is read after EAP has
-     * set jboss.server.data.dir, not at static field initialisation time.
+     * finished its own initialisation, not at static field initialisation time.
      */
-    static final String SNAPSHOT_DIR_PROP   = "kie.session.snapshot.dir";
-    static final String JBOSS_DATA_DIR_PROP = "jboss.server.data.dir";
-    static final String FALLBACK_DIR        = "standalone/data/kie-snapshots";
+    static final String SNAPSHOT_DIR_PROP = "kie.session.snapshot.dir";
 
     private String snapshotDir;   // resolved in init(), never static
     private KieServerRegistry registry;
@@ -85,23 +86,21 @@ public class SessionMarshalExtension implements KieServerExtension {
     public void init(KieServerImpl kieServer, KieServerRegistry registry) {
         this.registry = registry;
 
-        // Resolve the snapshot directory now — after EAP has set jboss.server.data.dir.
-        // Priority:
-        //   1. -Dkie.session.snapshot.dir explicitly set by the operator
-        //   2. ${jboss.server.data.dir}/kie-snapshots  (standalone/data/kie-snapshots)
-        //   3. FALLBACK_DIR as a last resort if neither property is available
-        String explicit = System.getProperty(SNAPSHOT_DIR_PROP);
-        if (explicit != null && !explicit.isBlank()) {
-            snapshotDir = explicit;
-        } else {
-            String jbossData = System.getProperty(JBOSS_DATA_DIR_PROP);
-            snapshotDir = (jbossData != null && !jbossData.isBlank())
-                    ? jbossData + File.separator + "kie-snapshots"
-                    : FALLBACK_DIR;
+        // Resolve the snapshot directory from the explicit system property only.
+        // No container-specific fallback (jboss.server.data.dir etc.) — using one
+        // would silently break portability across EAP, Tomcat, WebSphere, etc.
+        snapshotDir = System.getProperty(SNAPSHOT_DIR_PROP);
+        if (snapshotDir == null || snapshotDir.isBlank()) {
+            log.warn("{} extension: '{}' system property is not set. " +
+                     "Set -D{}=/your/path before starting the server. " +
+                     "Session save/restore will be DISABLED until the property is present.",
+                    EXTENSION_NAME, SNAPSHOT_DIR_PROP, SNAPSHOT_DIR_PROP);
+            snapshotDir = null;   // explicit null → guards in saveSession / restoreSession
         }
 
         initialized = true;
-        log.info("{} extension initialized. Snapshot directory: {}", EXTENSION_NAME, snapshotDir);
+        log.info("{} extension initialized. Snapshot directory: {}",
+                EXTENSION_NAME, snapshotDir != null ? snapshotDir : "<NOT SET — save/restore disabled>");
     }
 
     @Override
@@ -127,6 +126,11 @@ public class SessionMarshalExtension implements KieServerExtension {
      */
     @Override
     public void createContainer(String id, KieContainerInstance container, Map<String, Object> parameters) {
+        if (snapshotDir == null) {
+            log.warn("[createContainer] Skipping restore for container={} — '{}' not configured",
+                    id, SNAPSHOT_DIR_PROP);
+            return;
+        }
         forEachSession(id, container, (kbaseName, sessionName, session) -> {
             File snapshot = snapshotFile(id, kbaseName, sessionName);
             if (!snapshot.exists()) {
@@ -228,6 +232,11 @@ public class SessionMarshalExtension implements KieServerExtension {
      */
     void saveSession(String containerId, String kbaseName, String sessionName,
                      KieSession session, String caller) {
+        if (snapshotDir == null) {
+            log.warn("[{}] Skipping save for container={} kbase={} session={} — '{}' not configured",
+                    caller, containerId, kbaseName, sessionName, SNAPSHOT_DIR_PROP);
+            return;
+        }
         File target = snapshotFile(containerId, kbaseName, sessionName);
         File tmp    = new File(target.getParent(), target.getName() + ".tmp");
         target.getParentFile().mkdirs();
@@ -261,6 +270,7 @@ public class SessionMarshalExtension implements KieServerExtension {
      */
     private void restoreSession(String containerId, String kbaseName, String sessionName,
                                 KieSession session, File snapshot) {
+        // snapshotDir null-check is performed in createContainer() before calling us
         try (FileInputStream fis = new FileInputStream(snapshot)) {
             Marshaller marshaller = KieServices.get().getMarshallers()
                     .newMarshaller(session.getKieBase());

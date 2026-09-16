@@ -8,6 +8,7 @@ import java.util.List;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import org.kie.api.runtime.CommandExecutor;
@@ -108,33 +109,40 @@ public class SessionMarshalAppComponents implements KieServerApplicationComponen
          * Saves all sessions in the container to disk.
          *
          * GET server/containers/instances/{containerId}/ksession/marshal
+         *
+         * Returns HTTP 200 with a JSON array of {@link MarshalSaveResult} objects.
+         * An empty array (no sessions) is still HTTP 200 — an empty result is not an error.
          */
         @GET
         @Path("/marshal")
         public Response marshalAll(@PathParam("containerId") String containerId) {
             KieContainerInstance container = registry.getContainer(containerId);
             if (container == null) {
-                return Response.status(404).entity("No such container: " + containerId).build();
+                return Response.status(404)
+                        .entity("{\"error\":\"No such container: " + containerId + "\"}")
+                        .type(MediaType.APPLICATION_JSON)
+                        .build();
             }
 
             // Obtain the lifecycle extension to reuse its snapshot path logic and saveSession().
             SessionMarshalExtension ext = getExtension();
             if (ext == null) {
-                return Response.status(503).entity("SessionMarshal extension not available").build();
+                return Response.status(503)
+                        .entity("{\"error\":\"SessionMarshal extension not available\"}")
+                        .type(MediaType.APPLICATION_JSON)
+                        .build();
             }
 
-            StringBuilder report = new StringBuilder();
+            List<MarshalSaveResult> results = new ArrayList<>();
             ext.forEachSession(containerId, container, (kbaseName, sessionName, session) -> {
                 ext.saveSession(containerId, kbaseName, sessionName, session, "REST-marshalAll");
-                report.append("Saved ").append(containerId).append("/").append(kbaseName)
-                      .append("/").append(sessionName)
-                      .append(" — ").append(session.getFactCount()).append(" facts\n");
+                results.add(new MarshalSaveResult(
+                        containerId, kbaseName, sessionName,
+                        session.getFactCount(),
+                        ext.snapshotFile(containerId, kbaseName, sessionName).getAbsolutePath()));
             });
 
-            String body = report.toString().trim();
-            return body.isEmpty()
-                    ? Response.status(404).entity("No sessions in container: " + containerId).build()
-                    : Response.ok(body).build();
+            return Response.ok(MarshalSaveResult.toJson(results), MediaType.APPLICATION_JSON).build();
         }
 
         /**
@@ -167,11 +175,12 @@ public class SessionMarshalAppComponents implements KieServerApplicationComponen
             KieSession session = (KieSession) executor;
             ext.saveSession(containerId, kbaseName, sessionName, session, "REST-marshalOne");
 
-            String msg = "Saved " + containerId + "/" + kbaseName + "/" + sessionName
-                    + " — " + session.getFactCount() + " facts → "
-                    + ext.snapshotFile(containerId, kbaseName, sessionName).getAbsolutePath();
-            log.info("[REST] {}", msg);
-            return Response.ok(msg).build();
+            MarshalSaveResult result = new MarshalSaveResult(
+                    containerId, kbaseName, sessionName,
+                    session.getFactCount(),
+                    ext.snapshotFile(containerId, kbaseName, sessionName).getAbsolutePath());
+            log.info("[REST] {}", result);
+            return Response.ok(result.toJson(), MediaType.APPLICATION_JSON).build();
         }
 
         /**
@@ -184,6 +193,60 @@ public class SessionMarshalAppComponents implements KieServerApplicationComponen
             org.kie.server.services.api.KieServerExtension ext =
                     registry.getServerExtension(SessionMarshalExtension.EXTENSION_NAME);
             return (ext instanceof SessionMarshalExtension) ? (SessionMarshalExtension) ext : null;
+        }
+    }
+
+    // ── JSON response DTO ────────────────────────────────────────────────────
+
+    /**
+     * Immutable result record for a single saved session.
+     *
+     * <p>Uses manual JSON serialisation so the extension has zero dependency on
+     * Jackson or any other JSON library beyond what KIE Server already ships.
+     * The format is simple enough that hand-written JSON is less fragile than
+     * pulling in an optional dependency at compile time.</p>
+     */
+    static final class MarshalSaveResult {
+
+        final String containerId;
+        final String kbaseName;
+        final String sessionName;
+        final long   factCount;
+        final String snapshotPath;
+
+        MarshalSaveResult(String containerId, String kbaseName, String sessionName,
+                          long factCount, String snapshotPath) {
+            this.containerId  = containerId;
+            this.kbaseName    = kbaseName;
+            this.sessionName  = sessionName;
+            this.factCount    = factCount;
+            this.snapshotPath = snapshotPath;
+        }
+
+        /** Single-object JSON. */
+        String toJson() {
+            return "{\"containerId\":\"" + containerId + "\""
+                 + ",\"kbaseName\":\""    + kbaseName    + "\""
+                 + ",\"sessionName\":\""  + sessionName  + "\""
+                 + ",\"factCount\":"      + factCount
+                 + ",\"snapshotPath\":\"" + snapshotPath.replace("\\", "\\\\") + "\""
+                 + "}";
+        }
+
+        /** JSON array serialisation for the marshalAll response. */
+        static String toJson(List<MarshalSaveResult> list) {
+            StringBuilder sb = new StringBuilder("[");
+            for (int i = 0; i < list.size(); i++) {
+                if (i > 0) sb.append(",");
+                sb.append(list.get(i).toJson());
+            }
+            return sb.append("]").toString();
+        }
+
+        @Override
+        public String toString() {
+            return "Saved " + containerId + "/" + kbaseName + "/" + sessionName
+                 + " — " + factCount + " facts → " + snapshotPath;
         }
     }
 }
